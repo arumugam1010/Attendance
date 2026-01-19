@@ -173,24 +173,13 @@ export default function Layout({ children }: LayoutProps) {
                   <Button variant="ghost" className="flex items-center gap-2 pl-2 pr-3">
                     <Avatar className="h-8 w-8 border-2 border-primary/20">
                       <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
-                        AD
+                        {user?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'U'}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="hidden sm:block text-sm font-medium">Admin</span>
+                    <span className="hidden sm:block text-sm font-medium">{user?.name || 'User'}</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem>
-                    <User className="h-4 w-4 mr-2" />
-                    Profile
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Settings className="h-4 w-4 mr-2" />
-                    Settings
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
                   <DropdownMenuItem className="text-destructive" onClick={handleLogout}>
                     <LogOut className="h-4 w-4 mr-2" />
                     Log out

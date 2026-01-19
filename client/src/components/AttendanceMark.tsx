@@ -13,14 +13,23 @@ interface Employee {
   name: string;
   role: string;
   site: string;
+  siteLat?: number;
+  siteLng?: number;
 }
 
 interface Site {
   id: string;
   name: string;
+  lat?: number;
+  lng?: number;
 }
 
-export default function AttendanceMark() {
+interface AttendanceMarkProps {
+  onAttendanceMarked?: () => void;
+  onClose?: () => void;
+}
+
+export default function AttendanceMark({ onAttendanceMarked, onClose }: AttendanceMarkProps) {
   const { user } = useAuth();
   const [attendanceType, setAttendanceType] = useState<'check-in' | 'check-out'>('check-in');
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -28,44 +37,127 @@ export default function AttendanceMark() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [employeeSite, setEmployeeSite] = useState<Site | null>(null);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(true);
 
+  useEffect(() => {
+    // Fetch employee site information
+    const fetchEmployeeSite = async () => {
+      if (user?.id) {
+        try {
+          const employees = JSON.parse(localStorage.getItem('employees') || '[]');
+          const employee = employees.find((emp: Employee) => emp.id === user.id);
+          if (employee?.site) {
+            const sites = JSON.parse(localStorage.getItem('sites') || '[]');
+            const site = sites.find((s: Site) => s.id === employee.site);
+            setEmployeeSite(site || null);
+          }
+        } catch (error) {
+          console.error('Error fetching employee site:', error);
+        }
+      }
+    };
 
+    fetchEmployeeSite();
+  }, [user?.id]);
 
+  // Auto-fetch location when component mounts (modal opens)
+  useEffect(() => {
+    const autoFetchLocation = async () => {
+      setIsLoadingLocation(true);
+      try {
+        await getLocation();
+      } catch (error) {
+        // Error is already set in getLocation
+      } finally {
+        setIsLoadingLocation(false);
+      }
+    };
 
+    autoFetchLocation();
+  }, []);
 
-  const getLocation = () => {
-    if (!navigator.geolocation) {
-      setError('Geolocation is not supported by this browser');
-      return;
+  const getLocation = (): Promise<{ lat: number; lng: number }> => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('Geolocation is not supported by this browser'));
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const now = new Date();
+          const locationData = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          };
+          setLocation(locationData);
+          setCurrentDateTime({
+            date: now.toLocaleDateString(),
+            time: now.toLocaleTimeString(),
+          });
+          setError('');
+          resolve(locationData);
+        },
+        (err) => {
+          let errorMessage = 'Unable to retrieve location: ' + err.message;
+
+          // Provide more user-friendly error messages
+          if (err.code === 1) {
+            errorMessage = 'Location access denied. Please enable location permissions in your browser settings and try again.';
+          } else if (err.code === 2) {
+            errorMessage = 'Location information is unavailable. Please check your device settings.';
+          } else if (err.code === 3) {
+            errorMessage = 'Location request timed out. Please try again.';
+          } else if (err.message.includes('Only secure origins are allowed')) {
+            errorMessage = 'Location services require a secure connection (HTTPS). Please ensure you are accessing the application over HTTPS.';
+          }
+
+          setError(errorMessage);
+          reject(new Error(errorMessage));
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000, // 5 minutes
+        }
+      );
+    });
+  };
+
+  const verifyLocation = (currentLocation: { lat: number; lng: number }) => {
+    if (!employeeSite?.lat || !employeeSite?.lng) {
+      // If no site coordinates, allow attendance
+      return true;
     }
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const now = new Date();
-        setLocation({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        });
-        setCurrentDateTime({
-          date: now.toLocaleDateString(),
-          time: now.toLocaleTimeString(),
-        });
-        setError('');
-      },
-      (err) => {
-        setError('Unable to retrieve location: ' + err.message);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 300000, // 5 minutes
-      }
+    // Calculate distance between current location and site location
+    const distance = calculateDistance(
+      currentLocation.lat,
+      currentLocation.lng,
+      employeeSite.lat,
+      employeeSite.lng
     );
+
+    // Allow attendance if within 500 meters (adjustable)
+    return distance <= 0.5; // 0.5 km = 500 meters
+  };
+
+  const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+    const R = 6371; // Earth's radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
   };
 
   const handleSubmit = async () => {
-    if (!user || !location) {
-      setError('Please select attendance type and capture location');
+    if (!user) {
+      setError('User not authenticated');
       return;
     }
 
@@ -74,24 +166,74 @@ export default function AttendanceMark() {
     setSuccess('');
 
     try {
+      // First, get the current location
+      const currentLocation = await getLocation();
+
+      // Verify location is at assigned site
+      if (!verifyLocation(currentLocation)) {
+        setError('You must be at your assigned site to mark attendance');
+        setLocation(null);
+        setCurrentDateTime(null);
+        return;
+      }
+
       const attendanceData = {
         employeeId: user.id,
         type: attendanceType,
-        location: location,
+        location: currentLocation,
         date: currentDateTime?.date || new Date().toLocaleDateString(),
         time: currentDateTime?.time || new Date().toLocaleTimeString(),
         timestamp: new Date().toISOString(),
       };
 
-      await attendanceAPI.markAttendance(attendanceData);
-      setSuccess('Attendance marked successfully!');
+      // Store attendance data in localStorage instead of API call
+      try {
+        const existingAttendance = JSON.parse(localStorage.getItem('attendance') || '[]');
+        const newAttendanceRecord = {
+          id: Date.now().toString(),
+          employeeId: user.id,
+          employeeName: user.name || 'Unknown Employee',
+          role: user.role || 'Unknown Role',
+          assignedLocation: employeeSite?.name || 'Unknown Site',
+          attendanceLocation: employeeSite?.name || 'Unknown Site',
+          status: 'present',
+          checkIn: currentDateTime?.time || new Date().toLocaleTimeString(),
+          checkOut: null,
+          date: new Date().toISOString().split('T')[0],
+          location: currentLocation,
+          timestamp: new Date().toISOString(),
+        };
+
+        existingAttendance.push(newAttendanceRecord);
+        localStorage.setItem('attendance', JSON.stringify(existingAttendance));
+
+        setSuccess('Attendance marked successfully!');
+
+        // Call the callback to refresh parent components
+        if (onAttendanceMarked) {
+          onAttendanceMarked();
+        }
+
+        // Close modal after a short delay to show success message
+        setTimeout(() => {
+          if (onClose) {
+            onClose();
+          }
+        }, 2000);
+      } catch (storageError) {
+        console.error('Error saving to localStorage:', storageError);
+        setError('Failed to save attendance record');
+        return;
+      }
 
       // Reset form
       setAttendanceType('check-in');
       setLocation(null);
       setCurrentDateTime(null);
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to mark attendance');
+      setError(err.message || 'Failed to mark attendance');
+      setLocation(null);
+      setCurrentDateTime(null);
     } finally {
       setIsSubmitting(false);
     }
@@ -134,8 +276,6 @@ export default function AttendanceMark() {
             </div>
           </div>
 
-
-
           <div className="space-y-2">
             <Label htmlFor="type">Attendance Type</Label>
             <Select value={attendanceType} onValueChange={(value: 'check-in' | 'check-out') => setAttendanceType(value)}>
@@ -149,48 +289,46 @@ export default function AttendanceMark() {
             </Select>
           </div>
 
-          <div className="flex gap-2">
-            <Button
-              variant={location ? "secondary" : "outline"}
-              onClick={getLocation}
-              className="flex-1"
-              disabled={!!location}
-            >
-              <MapPin className="h-4 w-4 mr-2" />
-              {location ? 'Location Captured' : 'Get Location'}
-            </Button>
+          <div className="space-y-2">
+            <Label htmlFor="current-time">Current Time</Label>
+            <div className="p-3 border rounded-md bg-muted">
+              <p className="font-medium">
+                {isLoadingLocation ? 'Fetching...' : (currentDateTime?.time || 'Not available')}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="current-location">Current Location</Label>
+            <div className="p-3 border rounded-md bg-muted">
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-muted-foreground" />
+                <p className="font-medium">
+                  {isLoadingLocation ? 'Fetching location...' :
+                   location ? `${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}` : 'Location not available'}
+                </p>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <h3 className="font-medium">Ready to Submit</h3>
-              <p className="text-sm text-muted-foreground">
-                Employee: {user?.name || 'Not logged in'} •
-                Type: {attendanceType === 'check-in' ? 'Check In' : 'Check Out'} •
-                Location: {location ? 'Captured' : 'Not captured'}
-              </p>
-            </div>
-            <Button
-              onClick={handleSubmit}
-              disabled={!user || !location || isSubmitting}
-              size="lg"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Submitting...
-                </>
-              ) : (
-                'Mark Attendance'
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex justify-end">
+        <Button
+          onClick={handleSubmit}
+          disabled={!user || !location || isSubmitting || isLoadingLocation}
+          size="lg"
+        >
+          {isSubmitting ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Marking Attendance...
+            </>
+          ) : (
+            'Check In'
+          )}
+        </Button>
+      </div>
     </div>
   );
 }

@@ -1,10 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Calendar } from "@/components/ui/calendar";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -29,6 +36,9 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import AttendanceMark from "@/components/AttendanceMark";
+import { useAuth } from "@/contexts/AuthContext";
+import { attendanceAPI, employeesAPI } from "@/services/api";
 
 interface AttendanceRecord {
   id: string;
@@ -59,27 +69,51 @@ const sites = ["All Sites", "Downtown Tower", "Harbor Bridge", "Sunset Residence
 const statusOptions = ["All Status", "Present", "Absent", "Late", "Leave", "Half Day"];
 
 export default function Attendance() {
+  const { user } = useAuth();
   const [date, setDate] = useState<Date>(new Date());
   const [attendance, setAttendance] = useState<AttendanceRecord[]>(initialAttendance);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSite, setSelectedSite] = useState("All Sites");
   const [selectedStatus, setSelectedStatus] = useState("All Status");
+  const [userAssignedLocation, setUserAssignedLocation] = useState<string>("");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  useEffect(() => {
+    // Get the logged-in user's assigned location
+    if (user?.id) {
+      try {
+        const employees = JSON.parse(localStorage.getItem('employees') || '[]');
+        const currentUser = employees.find((emp: any) => emp.id === user.id);
+        if (currentUser?.site) {
+          setUserAssignedLocation(currentUser.site);
+        }
+      } catch (error) {
+        console.error('Error fetching user location:', error);
+      }
+    }
+  }, [user?.id]);
 
   const filteredAttendance = attendance.filter((record) => {
+    // First filter by user's assigned location
+    const isSameLocation = record.assignedLocation === userAssignedLocation;
+
+    // Then apply other filters
     const matchesSearch = record.employeeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       record.employeeId.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesSite = selectedSite === "All Sites" || record.assignedLocation === selectedSite;
     const matchesStatus = selectedStatus === "All Status" ||
       record.status.toLowerCase().replace("-", " ") === selectedStatus.toLowerCase();
-    return matchesSearch && matchesSite && matchesStatus;
+
+    return isSameLocation && matchesSearch && matchesSite && matchesStatus;
   });
 
   const stats = {
-    present: attendance.filter(r => r.status === "present").length,
-    absent: attendance.filter(r => r.status === "absent").length,
-    late: attendance.filter(r => r.status === "late").length,
-    leave: attendance.filter(r => r.status === "leave").length,
-    halfDay: attendance.filter(r => r.status === "half-day").length,
+    present: filteredAttendance.filter(r => r.status === "present").length,
+    absent: filteredAttendance.filter(r => r.status === "absent").length,
+    late: filteredAttendance.filter(r => r.status === "late").length,
+    leave: filteredAttendance.filter(r => r.status === "leave").length,
+    halfDay: filteredAttendance.filter(r => r.status === "half-day").length,
   };
 
 
@@ -107,6 +141,11 @@ export default function Attendance() {
     }
   };
 
+  const handleAttendanceMarked = () => {
+    setRefreshKey(prev => prev + 1);
+    // You could also fetch fresh data from the API here
+  };
+
   return (
     <div className="space-y-6 animate-in">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -119,6 +158,20 @@ export default function Attendance() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="lg" className="gap-2">
+                <Clock className="h-5 w-5" />
+                Mark Attendance
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Mark Attendance</DialogTitle>
+              </DialogHeader>
+              <AttendanceMark onAttendanceMarked={handleAttendanceMarked} onClose={() => setIsDialogOpen(false)} />
+            </DialogContent>
+          </Dialog>
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" className="gap-2" data-testid="button-select-date">
@@ -210,16 +263,6 @@ export default function Attendance() {
               />
             </div>
             <div className="flex gap-2">
-              <Select value={selectedSite} onValueChange={setSelectedSite}>
-                <SelectTrigger className="w-[180px]" data-testid="select-filter-site">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {sites.map((site) => (
-                    <SelectItem key={site} value={site}>{site}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
               <Select value={selectedStatus} onValueChange={setSelectedStatus}>
                 <SelectTrigger className="w-[140px]" data-testid="select-filter-status">
                   <SelectValue />

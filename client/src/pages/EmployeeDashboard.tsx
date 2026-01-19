@@ -21,6 +21,7 @@ import {
   Phone,
   Mail,
   Shield,
+  Users,
 } from "lucide-react";
 import { format } from "date-fns";
 import { workAssignmentsAPI, attendanceAPI } from "@/services/api";
@@ -176,6 +177,54 @@ export default function EmployeeDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Team Members at Same Site */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-display flex items-center gap-2">
+            <Users className="h-5 w-5 text-primary" />
+            Team Members
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {(() => {
+              // Get employees at the same site
+              const employees = JSON.parse(localStorage.getItem('employees') || '[]');
+              const siteMembers = employees.filter((emp: any) =>
+                emp.site === employeeData.assignedSite && emp.id !== user?.id
+              );
+
+              if (siteMembers.length === 0) {
+                return (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No other team members at your site
+                  </p>
+                );
+              }
+
+              return siteMembers.slice(0, 5).map((member: any) => (
+                <div key={member.id} className="flex items-center gap-3 p-3 rounded-lg border bg-muted/50">
+                  <Avatar className="h-10 w-10 border-2 border-primary/20">
+                    <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
+                      {member.name.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <p className="font-medium">{member.name}</p>
+                    <p className="text-sm text-muted-foreground">{member.role}</p>
+                  </div>
+                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                    Active
+                  </Badge>
+                </div>
+              ));
+            })()}
+          </div>
+        </CardContent>
+      </Card>
+
+
     </div>
   );
 }
