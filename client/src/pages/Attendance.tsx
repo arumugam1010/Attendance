@@ -79,6 +79,11 @@ export default function Attendance() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
+  const handleAttendanceMarked = () => {
+    // Refresh the attendance data
+    setRefreshKey(prev => prev + 1);
+  };
+
   useEffect(() => {
     // Get the logged-in user's assigned location
     if (user?.id) {
@@ -139,11 +144,6 @@ export default function Attendance() {
       default:
         return null;
     }
-  };
-
-  const handleAttendanceMarked = () => {
-    setRefreshKey(prev => prev + 1);
-    // You could also fetch fresh data from the API here
   };
 
   return (

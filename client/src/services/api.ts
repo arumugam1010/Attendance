@@ -37,68 +37,131 @@ export const authAPI = {
 // Employees API
 export const employeesAPI = {
   getAll: async () => {
-    const response = await api.get('/employees');
-    return response.data;
+    // For demo purposes, use localStorage instead of API
+    const employees = JSON.parse(localStorage.getItem('employees') || '[]');
+    if (employees.length === 0) {
+      // Initialize with sample employees
+      const sampleEmployees = [
+        { id: '1', name: 'Admin', username: 'admin', role: 'admin', site: 'Downtown Tower' },
+        { id: 'EMP001', name: 'John Martinez', username: 'john', role: 'employee', site: 'Downtown Tower' },
+        { id: 'EMP002', name: 'Sarah Chen', username: 'sarah', role: 'employee', site: 'Harbor Bridge' },
+        { id: 'EMP003', name: 'Mike Johnson', username: 'mike', role: 'employee', site: 'Sunset Residences' },
+      ];
+      localStorage.setItem('employees', JSON.stringify(sampleEmployees));
+      return sampleEmployees;
+    }
+    return employees;
   },
   getById: async (id: string) => {
-    const response = await api.get(`/employees/${id}`);
-    return response.data;
+    const employees = JSON.parse(localStorage.getItem('employees') || '[]');
+    return employees.find((emp: any) => emp.id === id);
   },
   create: async (employee: any) => {
-    const response = await api.post('/employees', employee);
-    return response.data;
+    const employees = JSON.parse(localStorage.getItem('employees') || '[]');
+    const newEmployee = {
+      ...employee,
+      id: Date.now().toString(),
+    };
+    employees.push(newEmployee);
+    localStorage.setItem('employees', JSON.stringify(employees));
+    return newEmployee;
   },
   update: async (id: string, employee: any) => {
-    const response = await api.put(`/employees/${id}`, employee);
-    return response.data;
+    const employees = JSON.parse(localStorage.getItem('employees') || '[]');
+    const index = employees.findIndex((emp: any) => emp.id === id);
+    if (index !== -1) {
+      employees[index] = { ...employees[index], ...employee };
+      localStorage.setItem('employees', JSON.stringify(employees));
+      return employees[index];
+    }
+    throw new Error('Employee not found');
   },
   delete: async (id: string) => {
-    const response = await api.delete(`/employees/${id}`);
-    return response.data;
+    const employees = JSON.parse(localStorage.getItem('employees') || '[]');
+    const filteredEmployees = employees.filter((emp: any) => emp.id !== id);
+    localStorage.setItem('employees', JSON.stringify(filteredEmployees));
+    return { success: true };
   },
 };
 
 // Attendance API
 export const attendanceAPI = {
   getAll: async () => {
-    const response = await api.get('/attendance');
-    return response.data;
+    // For demo purposes, use localStorage instead of API
+    const attendance = JSON.parse(localStorage.getItem('attendance') || '[]');
+    return attendance;
   },
   markAttendance: async (data: any) => {
-    const response = await api.post('/attendance', data);
-    return response.data;
+    // For demo purposes, use localStorage instead of API
+    const attendance = JSON.parse(localStorage.getItem('attendance') || '[]');
+    const newRecord = {
+      ...data,
+      id: Date.now().toString(),
+      timestamp: new Date().toISOString(),
+    };
+    attendance.push(newRecord);
+    localStorage.setItem('attendance', JSON.stringify(attendance));
+    return newRecord;
   },
   getByEmployee: async (employeeId: string) => {
-    const response = await api.get(`/attendance/employee/${employeeId}`);
-    return response.data;
+    // For demo purposes, use localStorage instead of API
+    const attendance = JSON.parse(localStorage.getItem('attendance') || '[]');
+    return attendance.filter((record: any) => record.employeeId === employeeId);
   },
   getByDate: async (date: string) => {
-    const response = await api.get(`/attendance/date/${date}`);
-    return response.data;
+    // For demo purposes, use localStorage instead of API
+    const attendance = JSON.parse(localStorage.getItem('attendance') || '[]');
+    return attendance.filter((record: any) => record.date === date);
   },
 };
 
 // Sites API
 export const sitesAPI = {
   getAll: async () => {
-    const response = await api.get('/sites');
-    return response.data;
+    // For demo purposes, use localStorage instead of API
+    const sites = JSON.parse(localStorage.getItem('sites') || '[]');
+    if (sites.length === 0) {
+      // Initialize with sample sites
+      const sampleSites = [
+        { id: '1', name: 'Downtown Tower' },
+        { id: '2', name: 'Harbor Bridge' },
+        { id: '3', name: 'Sunset Residences' },
+        { id: '4', name: 'Metro Station' },
+      ];
+      localStorage.setItem('sites', JSON.stringify(sampleSites));
+      return sampleSites;
+    }
+    return sites;
   },
   getById: async (id: string) => {
-    const response = await api.get(`/sites/${id}`);
-    return response.data;
+    const sites = JSON.parse(localStorage.getItem('sites') || '[]');
+    return sites.find((site: any) => site.id === id);
   },
   create: async (site: any) => {
-    const response = await api.post('/sites', site);
-    return response.data;
+    const sites = JSON.parse(localStorage.getItem('sites') || '[]');
+    const newSite = {
+      ...site,
+      id: Date.now().toString(),
+    };
+    sites.push(newSite);
+    localStorage.setItem('sites', JSON.stringify(sites));
+    return newSite;
   },
   update: async (id: string, site: any) => {
-    const response = await api.put(`/sites/${id}`, site);
-    return response.data;
+    const sites = JSON.parse(localStorage.getItem('sites') || '[]');
+    const index = sites.findIndex((s: any) => s.id === id);
+    if (index !== -1) {
+      sites[index] = { ...sites[index], ...site };
+      localStorage.setItem('sites', JSON.stringify(sites));
+      return sites[index];
+    }
+    throw new Error('Site not found');
   },
   delete: async (id: string) => {
-    const response = await api.delete(`/sites/${id}`);
-    return response.data;
+    const sites = JSON.parse(localStorage.getItem('sites') || '[]');
+    const filteredSites = sites.filter((s: any) => s.id !== id);
+    localStorage.setItem('sites', JSON.stringify(filteredSites));
+    return { success: true };
   },
 };
 

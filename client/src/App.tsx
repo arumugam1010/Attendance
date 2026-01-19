@@ -17,8 +17,9 @@ import Sites from "@/pages/Sites";
 import NotFound from "@/pages/not-found";
 import RoleManagement from "@/components/RoleManagement";
 import WorkAssignment from "@/components/WorkAssignment";
-import Profile from "@/pages/Profile";
+import AttendanceHistory from "@/components/AttendanceHistory";
 import AssignedWork from "@/pages/AssignedWork";
+import Profile from "@/pages/Profile";
 
 function AppContent() {
   const { isAuthenticated } = useAuth();
@@ -47,7 +48,7 @@ function AppContent() {
         <Route path="/admin/sites" component={Sites} />
         <Route path="/admin/reports" component={Reports} />
         <Route path="/employee/attendance" component={Attendance} />
-        <Route path="/employee/history" component={Attendance} />
+        <Route path="/employee/history" component={AttendanceHistory} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { MapPin, CheckCircle, Loader2 } from 'lucide-react';
 import { attendanceAPI } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { Link } from 'wouter';
 
 interface Employee {
   id: string;
@@ -179,52 +180,34 @@ export default function AttendanceMark({ onAttendanceMarked, onClose }: Attendan
 
       const attendanceData = {
         employeeId: user.id,
-        type: attendanceType,
+        employeeName: user.name || 'Unknown Employee',
+        role: user.role || 'Unknown Role',
+        assignedLocation: employeeSite?.name || 'Unknown Site',
+        attendanceLocation: employeeSite?.name || 'Unknown Site',
+        status: 'present',
+        checkIn: currentDateTime?.time || new Date().toLocaleTimeString(),
+        checkOut: null,
+        date: new Date().toISOString().split('T')[0],
         location: currentLocation,
-        date: currentDateTime?.date || new Date().toLocaleDateString(),
-        time: currentDateTime?.time || new Date().toLocaleTimeString(),
         timestamp: new Date().toISOString(),
       };
 
-      // Store attendance data in localStorage instead of API call
-      try {
-        const existingAttendance = JSON.parse(localStorage.getItem('attendance') || '[]');
-        const newAttendanceRecord = {
-          id: Date.now().toString(),
-          employeeId: user.id,
-          employeeName: user.name || 'Unknown Employee',
-          role: user.role || 'Unknown Role',
-          assignedLocation: employeeSite?.name || 'Unknown Site',
-          attendanceLocation: employeeSite?.name || 'Unknown Site',
-          status: 'present',
-          checkIn: currentDateTime?.time || new Date().toLocaleTimeString(),
-          checkOut: null,
-          date: new Date().toISOString().split('T')[0],
-          location: currentLocation,
-          timestamp: new Date().toISOString(),
-        };
+      // Use API to mark attendance
+      await attendanceAPI.markAttendance(attendanceData);
 
-        existingAttendance.push(newAttendanceRecord);
-        localStorage.setItem('attendance', JSON.stringify(existingAttendance));
+      setSuccess('Attendance marked successfully!');
 
-        setSuccess('Attendance marked successfully!');
-
-        // Call the callback to refresh parent components
-        if (onAttendanceMarked) {
-          onAttendanceMarked();
-        }
-
-        // Close modal after a short delay to show success message
-        setTimeout(() => {
-          if (onClose) {
-            onClose();
-          }
-        }, 2000);
-      } catch (storageError) {
-        console.error('Error saving to localStorage:', storageError);
-        setError('Failed to save attendance record');
-        return;
+      // Call the callback to refresh parent components
+      if (onAttendanceMarked) {
+        onAttendanceMarked();
       }
+
+      // Close modal after a short delay to show success message
+      setTimeout(() => {
+        if (onClose) {
+          onClose();
+        }
+      }, 2000);
 
       // Reset form
       setAttendanceType('check-in');
@@ -259,7 +242,14 @@ export default function AttendanceMark({ onAttendanceMarked, onClose }: Attendan
       {success && (
         <Alert className="border-success text-success">
           <CheckCircle className="h-4 w-4" />
-          <AlertDescription>{success}</AlertDescription>
+          <AlertDescription>
+            {success}
+            <div className="mt-2">
+              <Link href="/employee/history" className="text-success underline hover:no-underline">
+                View your attendance history
+              </Link>
+            </div>
+          </AlertDescription>
         </Alert>
       )}
 

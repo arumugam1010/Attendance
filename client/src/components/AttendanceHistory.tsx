@@ -35,6 +35,7 @@ import {
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { attendanceAPI, employeesAPI, sitesAPI } from '@/services/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface AttendanceRecord {
   id: string;
@@ -42,7 +43,6 @@ interface AttendanceRecord {
   employeeName: string;
   role: string;
   assignedLocation: string;
-  attendanceLocation: string;
   status: 'present' | 'absent' | 'late' | 'leave' | 'half-day';
   checkIn: string | null;
   checkOut: string | null;
@@ -52,6 +52,7 @@ interface AttendanceRecord {
 }
 
 export default function AttendanceHistory() {
+  const { user } = useAuth();
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [sites, setSites] = useState<any[]>([]);
@@ -68,11 +69,15 @@ export default function AttendanceHistory() {
 
   const fetchData = async () => {
     try {
-      const [attendanceRes, employeesRes, sitesRes] = await Promise.all([
-        attendanceAPI.getAll(),
-        employeesAPI.getAll(),
-        sitesAPI.getAll(),
-      ]);
+      let attendanceRes;
+      if (user?.role === 'employee') {
+        attendanceRes = await attendanceAPI.getByEmployee(user.id);
+      } else {
+        attendanceRes = await attendanceAPI.getAll();
+      }
+
+      const employeesRes = await employeesAPI.getAll();
+      const sitesRes = await sitesAPI.getAll();
 
       const attendanceData = Array.isArray(attendanceRes) ? attendanceRes : [];
       const employeesData = Array.isArray(employeesRes) ? employeesRes : [];
@@ -85,7 +90,6 @@ export default function AttendanceHistory() {
           employeeName: employee ? employee.name : 'Unknown Employee',
           role: employee ? employee.role : 'Unknown Role',
           assignedLocation: employee ? employee.site : 'Unknown Site',
-          attendanceLocation: 'Downtown Tower', // Dummy data for UI-level demonstration
         };
       });
 
@@ -103,16 +107,25 @@ export default function AttendanceHistory() {
   };
 
   const filteredAttendance = (Array.isArray(attendance) ? attendance : []).filter((record) => {
-    const recordDate = new Date(record.date).toDateString();
-    const selectedDate = date.toDateString();
-    const matchesDate = recordDate === selectedDate;
+    // Compare dates properly - record.date is in YYYY-MM-DD format
+    const recordDate = record.date;
+    const selectedDateStr = date.toISOString().split('T')[0]; // Convert to YYYY-MM-DD format
+    const matchesDate = recordDate === selectedDateStr;
 
-    const matchesSearch = record.employeeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      record.employeeId.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = user?.role === 'employee' 
+      ? true // Employees see all their records, no search needed
+      : (record.employeeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+         record.employeeId.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    const matchesEmployee = selectedEmployee === 'All Employees' || record.employeeId === selectedEmployee;
-    const matchesSite = selectedSite === 'All Sites' || record.assignedLocation === selectedSite;
-    const matchesStatus = selectedStatus === 'All Status' || record.status === selectedStatus.toLowerCase().replace(' ', '-');
+    const matchesEmployee = user?.role === 'employee' 
+      ? record.employeeId === user.id 
+      : (selectedEmployee === 'All Employees' || record.employeeId === selectedEmployee);
+    const matchesSite = user?.role === 'employee' 
+      ? true // Employees see their records regardless of site filter
+      : (selectedSite === 'All Sites' || record.assignedLocation === selectedSite);
+    const matchesStatus = user?.role === 'employee' 
+      ? (selectedStatus === 'All Status' || record.status === selectedStatus.toLowerCase().replace(' ', '-'))
+      : (selectedStatus === 'All Status' || record.status === selectedStatus.toLowerCase().replace(' ', '-'));
 
     return matchesDate && matchesSearch && matchesEmployee && matchesSite && matchesStatus;
   });
@@ -242,56 +255,77 @@ export default function AttendanceHistory() {
       <Card>
         <CardHeader className="pb-4">
           <div className="flex flex-col lg:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name or ID..."
-                className="pl-10"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            <div className="flex gap-2">
-              <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="All Employees">All Employees</SelectItem>
-                  {employees.map((emp) => (
-                    <SelectItem key={emp.id} value={emp.id}>
-                      {emp.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={selectedSite} onValueChange={setSelectedSite}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="All Sites">All Sites</SelectItem>
-                  {sites.map((site) => (
-                    <SelectItem key={site.id} value={site.name}>
-                      {site.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="All Status">All Status</SelectItem>
-                  <SelectItem value="Present">Present</SelectItem>
-                  <SelectItem value="Absent">Absent</SelectItem>
-                  <SelectItem value="Late">Late</SelectItem>
-                  <SelectItem value="Leave">Leave</SelectItem>
-                  <SelectItem value="Half Day">Half Day</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {user?.role === 'admin' && (
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name or ID..."
+                  className="pl-10"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+            )}
+            {user?.role === 'admin' && (
+              <div className="flex gap-2">
+                <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All Employees">All Employees</SelectItem>
+                    {employees.map((emp) => (
+                      <SelectItem key={emp.id} value={emp.id}>
+                        {emp.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={selectedSite} onValueChange={setSelectedSite}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All Sites">All Sites</SelectItem>
+                    {sites.map((site) => (
+                      <SelectItem key={site.id} value={site.name}>
+                        {site.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All Status">All Status</SelectItem>
+                    <SelectItem value="Present">Present</SelectItem>
+                    <SelectItem value="Absent">Absent</SelectItem>
+                    <SelectItem value="Late">Late</SelectItem>
+                    <SelectItem value="Leave">Leave</SelectItem>
+                    <SelectItem value="Half Day">Half Day</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {user?.role === 'employee' && (
+              <div className="flex gap-2">
+                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All Status">All Status</SelectItem>
+                    <SelectItem value="Present">Present</SelectItem>
+                    <SelectItem value="Absent">Absent</SelectItem>
+                    <SelectItem value="Late">Late</SelectItem>
+                    <SelectItem value="Leave">Leave</SelectItem>
+                    <SelectItem value="Half Day">Half Day</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -301,7 +335,7 @@ export default function AttendanceHistory() {
                 <tr className="border-b">
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Employee</th>
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Assigned Location</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Attendance Location</th>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">GPS Location</th>
                   <th className="text-center py-3 px-4 font-medium text-muted-foreground">Check In</th>
                   <th className="text-center py-3 px-4 font-medium text-muted-foreground">Check Out</th>
                 </tr>
@@ -330,7 +364,16 @@ export default function AttendanceHistory() {
                         {record.assignedLocation}
                       </Badge>
                     </td>
-                    <td className="py-3 px-4 text-sm">{record.attendanceLocation}</td>
+                    <td className="py-3 px-4 text-sm">
+                      {record.location ? (
+                        <div className="font-mono text-xs">
+                          <div>Lat: {record.location.lat?.toFixed(6)}</div>
+                          <div>Lng: {record.location.lng?.toFixed(6)}</div>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">Not recorded</span>
+                      )}
+                    </td>
                     <td className="py-3 px-4 text-center">
                       {record.checkIn ? (
                         <span className="text-sm font-medium">
