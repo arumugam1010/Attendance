@@ -195,20 +195,22 @@ export default function Attendance() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="lg" className="gap-2">
-                <Clock className="h-5 w-5" />
-                Mark Attendance
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Mark Attendance</DialogTitle>
-              </DialogHeader>
-              <AttendanceMark onAttendanceMarked={handleAttendanceMarked} onClose={() => setIsDialogOpen(false)} />
-            </DialogContent>
-          </Dialog>
+          {user?.role === 'employee' && (
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="lg" className="gap-2">
+                  <Clock className="h-5 w-5" />
+                  Mark Attendance
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Mark Attendance</DialogTitle>
+                </DialogHeader>
+                <AttendanceMark onAttendanceMarked={handleAttendanceMarked} onClose={() => setIsDialogOpen(false)} />
+              </DialogContent>
+            </Dialog>
+          )}
           <Popover>
             <PopoverTrigger asChild>
               <Button variant="outline" className="gap-2" data-testid="button-select-date">
