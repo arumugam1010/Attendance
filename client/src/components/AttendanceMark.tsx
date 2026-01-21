@@ -92,6 +92,10 @@ export default function AttendanceMark({ onAttendanceMarked, onClose }: Attendan
             lat: position.coords.latitude,
             lng: position.coords.longitude,
           };
+          
+          console.log('📍 GPS Location captured:', locationData);
+          console.log('🎯 GPS Accuracy:', position.coords.accuracy, 'meters');
+          
           setLocation(locationData);
           setCurrentDateTime({
             date: now.toLocaleDateString(),
@@ -178,24 +182,67 @@ export default function AttendanceMark({ onAttendanceMarked, onClose }: Attendan
         return;
       }
 
-      const attendanceData = {
-        employeeId: user.id,
-        employeeName: user.name || 'Unknown Employee',
-        role: user.role || 'Unknown Role',
-        assignedLocation: employeeSite?.name || 'Unknown Site',
-        attendanceLocation: employeeSite?.name || 'Unknown Site',
-        status: 'present',
-        checkIn: currentDateTime?.time || new Date().toLocaleTimeString(),
-        checkOut: null,
-        date: new Date().toISOString().split('T')[0],
-        location: currentLocation,
-        timestamp: new Date().toISOString(),
-      };
+      const currentTime = currentDateTime?.time || new Date().toLocaleTimeString();
+      const currentDate = new Date().toISOString().split('T')[0];
 
-      // Use API to mark attendance
-      await attendanceAPI.markAttendance(attendanceData);
+      if (attendanceType === 'check-in') {
+        // Check if user already has a check-in for today
+        const existingAttendance = JSON.parse(localStorage.getItem('attendance') || '[]');
+        const todayRecord = existingAttendance.find((record: any) =>
+          record.employeeId === user.id && record.date === currentDate && record.checkIn && !record.checkOut
+        );
 
-      setSuccess('Attendance marked successfully!');
+        if (todayRecord) {
+          setError('You have already checked in today. Please check out instead.');
+          return;
+        }
+
+        // Create new check-in record
+        const attendanceData = {
+          employeeId: user.id,
+          employeeName: user.name || 'Unknown Employee',
+          role: user.role || 'Unknown Role',
+          assignedLocation: employeeSite?.name || 'Unknown Site',
+          attendanceLocation: employeeSite?.name || 'Unknown Site',
+          status: 'present',
+          checkIn: currentTime,
+          checkOut: null,
+          date: currentDate,
+          location: currentLocation,
+          timestamp: new Date().toISOString(),
+        };
+
+        // Use API to mark attendance
+        await attendanceAPI.markAttendance(attendanceData);
+        setSuccess('Checked in successfully!');
+      } else {
+        // Check-out: Find today's check-in record and update it
+        const existingAttendance = JSON.parse(localStorage.getItem('attendance') || '[]');
+        const todayRecord = existingAttendance.find((record: any) =>
+          record.employeeId === user.id && record.date === currentDate && record.checkIn && !record.checkOut
+        );
+
+        if (!todayRecord) {
+          setError('No check-in record found for today. Please check in first.');
+          return;
+        }
+
+        // Update the record with check-out time
+        const updatedRecord = {
+          ...todayRecord,
+          checkOut: currentTime,
+          location: currentLocation, // Update location for check-out as well
+          timestamp: new Date().toISOString(),
+        };
+
+        // Update in localStorage
+        const updatedAttendance = existingAttendance.map((record: any) =>
+          record.id === todayRecord.id ? updatedRecord : record
+        );
+        localStorage.setItem('attendance', JSON.stringify(updatedAttendance));
+
+        setSuccess('Checked out successfully!');
+      }
 
       // Call the callback to refresh parent components
       if (onAttendanceMarked) {
@@ -226,10 +273,13 @@ export default function AttendanceMark({ onAttendanceMarked, onClose }: Attendan
     <div className="space-y-6 animate-in">
       <div>
         <h1 className="text-3xl font-bold font-display tracking-tight">
-          Mark Attendance
+          {attendanceType === 'check-in' ? 'Check In' : 'Check Out'}
         </h1>
         <p className="text-muted-foreground mt-1">
-          Record your attendance with location verification
+          {attendanceType === 'check-in'
+            ? 'Record your check-in time with location verification'
+            : 'Record your check-out time with location verification'
+          }
         </p>
       </div>
 

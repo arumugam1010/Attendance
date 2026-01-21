@@ -107,9 +107,9 @@ export default function Layout({ children }: LayoutProps) {
               </div>
               <div>
                 <h1 className="text-lg font-bold font-display text-gradient bg-gradient-to-r from-primary to-amber-500 bg-clip-text text-transparent">
-                  BuildTrack
+                Attendance
                 </h1>
-                <p className="text-xs text-sidebar-foreground/60">Attendance System</p>
+                <p className="text-xs text-sidebar-foreground/60">Management System</p>
               </div>
             </a>
           </Link>

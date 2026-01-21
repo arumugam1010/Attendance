@@ -71,7 +71,7 @@ const statusOptions = ["All Status", "Present", "Absent", "Late", "Leave", "Half
 export default function Attendance() {
   const { user } = useAuth();
   const [date, setDate] = useState<Date>(new Date());
-  const [attendance, setAttendance] = useState<AttendanceRecord[]>(initialAttendance);
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSite, setSelectedSite] = useState("All Sites");
   const [selectedStatus, setSelectedStatus] = useState("All Status");
@@ -99,7 +99,44 @@ export default function Attendance() {
     }
   }, [user?.id]);
 
+  useEffect(() => {
+    // Fetch attendance data
+    const fetchAttendance = async () => {
+      try {
+        let data;
+        if (user?.role === 'employee') {
+          data = await attendanceAPI.getByEmployee(user.id);
+        } else {
+          data = await attendanceAPI.getAll();
+        }
+        // For demo, map to the expected format
+        const mappedData = data.map((record: any) => ({
+          id: record.id,
+          employeeId: record.employeeId,
+          employeeName: record.employeeName || 'Unknown',
+          role: record.role || 'Employee',
+          assignedLocation: record.site || 'Unknown',
+          attendanceLocation: record.site || 'Unknown',
+          status: record.status || 'present',
+          checkIn: record.checkIn || null,
+          checkOut: record.checkOut || null,
+        }));
+        setAttendance(mappedData);
+      } catch (error) {
+        console.error('Error fetching attendance:', error);
+        // Fallback to initial data
+        setAttendance(initialAttendance);
+      }
+    };
+    fetchAttendance();
+  }, [user?.id, user?.role, refreshKey]);
+
   const filteredAttendance = attendance.filter((record) => {
+    // If user is employee, only show their own record
+    if (user?.role === 'employee') {
+      return record.employeeId === user.id;
+    }
+
     // First filter by user's assigned location
     const isSameLocation = record.assignedLocation === userAssignedLocation;
 
@@ -191,91 +228,95 @@ export default function Attendance() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-success/10">
-              <UserCheck className="h-5 w-5 text-success" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold font-display">{stats.present}</p>
-              <p className="text-xs text-muted-foreground">Present</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-destructive/10">
-              <UserX className="h-5 w-5 text-destructive" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold font-display">{stats.absent}</p>
-              <p className="text-xs text-muted-foreground">Absent</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-warning/10">
-              <Clock className="h-5 w-5 text-warning" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold font-display">{stats.late}</p>
-              <p className="text-xs text-muted-foreground">Late</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <AlertCircle className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold font-display">{stats.leave}</p>
-              <p className="text-xs text-muted-foreground">On Leave</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="hover:shadow-md transition-shadow">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-purple-100">
-              <Clock className="h-5 w-5 text-purple-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold font-display">{stats.halfDay}</p>
-              <p className="text-xs text-muted-foreground">Half Day</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {user?.role !== 'employee' && (
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+          <Card className="hover:shadow-md transition-shadow">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-success/10">
+                <UserCheck className="h-5 w-5 text-success" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold font-display">{stats.present}</p>
+                <p className="text-xs text-muted-foreground">Present</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="hover:shadow-md transition-shadow">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-destructive/10">
+                <UserX className="h-5 w-5 text-destructive" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold font-display">{stats.absent}</p>
+                <p className="text-xs text-muted-foreground">Absent</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="hover:shadow-md transition-shadow">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-warning/10">
+                <Clock className="h-5 w-5 text-warning" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold font-display">{stats.late}</p>
+                <p className="text-xs text-muted-foreground">Late</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="hover:shadow-md transition-shadow">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <AlertCircle className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold font-display">{stats.leave}</p>
+                <p className="text-xs text-muted-foreground">On Leave</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="hover:shadow-md transition-shadow">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-purple-100">
+                <Clock className="h-5 w-5 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold font-display">{stats.halfDay}</p>
+                <p className="text-xs text-muted-foreground">Half Day</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <Card>
-        <CardHeader className="pb-4">
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name or ID..."
-                className="pl-10"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                data-testid="input-search-attendance"
-              />
+        {user?.role !== 'employee' && (
+          <CardHeader className="pb-4">
+            <div className="flex flex-col lg:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name or ID..."
+                  className="pl-10"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  data-testid="input-search-attendance"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                  <SelectTrigger className="w-[140px]" data-testid="select-filter-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {statusOptions.map((status) => (
+                      <SelectItem key={status} value={status}>{status}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                <SelectTrigger className="w-[140px]" data-testid="select-filter-status">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {statusOptions.map((status) => (
-                    <SelectItem key={status} value={status}>{status}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardHeader>
+          </CardHeader>
+        )}
         <CardContent>
           <div className="overflow-x-auto">
             <table className="w-full">
