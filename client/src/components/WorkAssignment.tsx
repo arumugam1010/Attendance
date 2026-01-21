@@ -153,8 +153,10 @@ export default function WorkAssignment() {
     }
 
     try {
+      // Get next work ID from localStorage, starting from 1
+      const nextWorkId = parseInt(localStorage.getItem('nextWorkId') || '1');
       const newAssignmentData: WorkAssignment = {
-        id: `WA${Date.now()}`,
+        id: nextWorkId.toString(),
         employeeId: newAssignment.employeeId,
         employeeName: newAssignment.employeeName,
         department: newAssignment.department,
@@ -166,6 +168,9 @@ export default function WorkAssignment() {
         endTime: newAssignment.endTime,
         status: newAssignment.status,
       };
+
+      // Increment and save next work ID
+      localStorage.setItem('nextWorkId', (nextWorkId + 1).toString());
 
       setAssignments([...assignments, newAssignmentData]);
       setNewAssignment({
