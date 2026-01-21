@@ -323,8 +323,8 @@ export default function Attendance() {
               <thead>
                 <tr className="border-b">
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground">Employee</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Assigned Location</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Attendance Location</th>
+                  {/* <th className="text-left py-3 px-4 font-medium text-muted-foreground">Assigned Location</th>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Attendance Location</th> */}
                   <th className="text-center py-3 px-4 font-medium text-muted-foreground">Status</th>
                   <th className="text-center py-3 px-4 font-medium text-muted-foreground">Check In</th>
                   <th className="text-center py-3 px-4 font-medium text-muted-foreground">Check Out</th>
@@ -350,12 +350,12 @@ export default function Attendance() {
                         </div>
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-sm">
+                    {/* <td className="py-3 px-4 text-sm">
                       <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
                         {record.assignedLocation}
                       </Badge>
                     </td>
-                    <td className="py-3 px-4 text-sm">{record.attendanceLocation}</td>
+                    <td className="py-3 px-4 text-sm">{record.attendanceLocation}</td> */}
                     <td className="py-3 px-4 text-center">
                       {getStatusBadge(record.status)}
                     </td>
